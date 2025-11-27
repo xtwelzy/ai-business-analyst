@@ -4,24 +4,65 @@ from config import OPENAI_API_KEY, MODEL
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 
-def generate_brd(requirements: dict) -> str:
+def extract_mermaid_blocks(text: str):
     """
-    Генерирует полный BRD документ с ВСЕМИ артефактами:
-    - Goal
-    - Problem
-    - Stakeholders
-    - Scope
-    - Business Rules
-    - FR
-    - Extended NFR
-    - KPI + KPI Tree
-    - Acceptance Criteria
-    - User Stories
-    - Use Case Diagram
-    - Business Process Diagram
-    - Activity Diagram
-    - Sequence Diagram
-    - Risk Matrix
+    Извлекает mermaid-блоки из финального BRD.
+    Возвращает dict:
+    {
+        "document": <BRD без mermaid>,
+        "kpi_tree_mermaid": "...",
+        "usecase_mermaid": "...",
+        "bpmn_mermaid": "...",
+        "activity_mermaid": "...",
+        "sequence_mermaid": "..."
+    }
+    """
+
+    import re
+
+    mermaid_blocks = re.findall(r"```mermaid(.*?)```", text, flags=re.DOTALL)
+
+    diagrams = {
+        "kpi_tree_mermaid": None,
+        "usecase_mermaid": None,
+        "bpmn_mermaid": None,
+        "activity_mermaid": None,
+        "sequence_mermaid": None
+    }
+
+    for block in mermaid_blocks:
+        cleaned = block.strip()
+
+        if "Root" in cleaned and "KPI" in cleaned:
+            diagrams["kpi_tree_mermaid"] = cleaned
+        elif "Actor" in cleaned and "System" in cleaned:
+            diagrams["usecase_mermaid"] = cleaned
+        elif "Start" in cleaned and "Step" in cleaned:
+            diagrams["bpmn_mermaid"] = cleaned
+        elif "Action" in cleaned or "A1" in cleaned:
+            diagrams["activity_mermaid"] = cleaned
+        elif "sequenceDiagram" in cleaned:
+            diagrams["sequence_mermaid"] = cleaned
+
+    clean_doc = re.sub(r"```mermaid.*?```", "", text, flags=re.DOTALL)
+
+    return {
+        "document": clean_doc.strip(),
+        **diagrams
+    }
+
+
+def generate_brd(requirements: dict) -> dict:
+    """
+    Генератор полного BRD — возвращает:
+    {
+        "document": "чистый BRD",
+        "kpi_tree_mermaid": "...",
+        "usecase_mermaid": "...",
+        "bpmn_mermaid": "...",
+        "activity_mermaid": "...",
+        "sequence_mermaid": "..."
+    }
     """
 
     prompt = f"""
@@ -84,7 +125,6 @@ FR-03: ...
 - Usability
 - Maintainability
 - Compliance
-
 Каждый раздел — 3–5 требований.
 
 # 8. KPI / Лидирующие показатели
@@ -102,14 +142,14 @@ flowchart TD
 ```
 
 # 9. Acceptance Criteria
-Минимум 5 критериев в формате:
+Минимум 5 пунктов:
 - AC-01: ...
 - AC-02: ...
 
 # 10. User Stories
+Минимум 3–6 stories.
 Формат:
 As a <role>, I want <feature>, so that <value>.
-Минимум 3–6 stories.
 
 # 11. Use Case Diagram (Mermaid)
 ```mermaid
@@ -174,4 +214,6 @@ sequenceDiagram
         temperature=0.15
     )
 
-    return response.choices[0].message.content
+    full_text = response.choices[0].message.content
+
+    return extract_mermaid_blocks(full_text)
