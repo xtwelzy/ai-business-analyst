@@ -56,7 +56,30 @@ async def send_long_message(msg, text):
 # ==============================
 @dp.message(Command("start"))
 async def start_cmd(msg: types.Message):
-    await msg.answer("👋 Привет! Я AI Business Analyst.\nНапиши /new чтобы начать сбор требований.")
+    await msg.answer("👋 Привет! Я AI Business Analyst.\nНапиши /new чтобы начать сбор требований.\n/help чтобы узнать все команды!")
+
+# ==============================
+# /help — список всех команд
+# ==============================
+@dp.message(Command("help"))
+async def help_cmd(msg: types.Message):
+    help_text = (
+        "📘 *Справка по командам*\n\n"
+        "Вот что я умею:\n\n"
+        "🆕 */new* — начать сбор требований с нуля\n"
+        "↩️ */back* — вернуться на один шаг назад\n"
+        "⏭ */skip* — пропустить текущий вопрос\n"
+        "📄 *Автоматически*: после последнего ответа я:\n"
+        "   — генерирую предварительный BRD\n"
+        "   — покажу кнопки *YES / NO*\n"
+        "   — затем создам PDF\n"
+        "   — загружу документ в Confluence\n\n"
+        "ℹ️ */help* — показать эту справку\n"
+        "❌ */cancel* — отменить текущую сессию и начать заново\n\n"
+        "Если что-то пойдёт не так — просто напиши */new*."
+    )
+
+    await msg.answer(help_text, parse_mode="Markdown")
 
 
 # ==============================
@@ -68,6 +91,16 @@ async def new_requirement(msg: types.Message):
     reset_user(user_id)
     add_user_answer(user_id, "step", 0)
     await msg.answer("🔎 Начинаем сбор требований.\n\n" + QUESTIONS[0][1])
+
+# ==============================
+# /cancel — отменить текущую сессию
+# ==============================
+
+@dp.message(Command("cancel"))
+async def cancel_cmd(msg: types.Message):
+    user_id = str(msg.from_user.id)
+    reset_user(user_id)
+    await msg.answer("❌ Текущая сессия отменена.\nНапиши /new чтобы начать заново.")
 
 
 # ==============================
@@ -85,6 +118,63 @@ async def go_back(msg: types.Message):
     add_user_answer(user_id, "step", step)
 
     await msg.answer(f"↩️ Возвращаюсь назад:\n\n{QUESTIONS[step][1]}")
+
+
+# ==============================
+# /skip — пропустить текущий вопрос
+# ==============================
+@dp.message(Command("skip"))
+async def skip_question(msg: types.Message):
+    user_id = str(msg.from_user.id)
+    dialog = get_user_dialog(user_id)
+
+    if "step" not in dialog:
+        return await msg.answer("❗ Нечего пропускать. Напиши /new чтобы начать.")
+
+    step = dialog["step"]
+
+    # Если уже на этапе подтверждения BRD — нельзя
+    if dialog.get(CONFIRMATION_FLAG):
+        return await msg.answer("❗ Сейчас нельзя пропустить, нужно подтвердить документ.")
+
+    # Если больше нечего пропускать
+    if step >= len(QUESTIONS):
+        return await msg.answer("❗ Все вопросы уже пройдены. Ожидается подтверждение BRD.")
+
+    key, _ = QUESTIONS[step]
+
+    # Ставим пустой ответ, чтобы структура была заполнена
+    add_user_answer(user_id, key, "— (пропущено пользователем) —")
+
+    # Переход вперёд
+    step += 1
+    add_user_answer(user_id, "step", step)
+
+    # Если это был последний шаг → идём в подтверждение BRD
+    if step >= len(QUESTIONS):
+        final_data = {k: v for k, v in dialog.items() if not k.startswith("_")}
+        preview = generate_brd(final_data)
+
+        add_user_answer(user_id, "brd_preview", preview)
+        add_user_answer(user_id, CONFIRMATION_FLAG, True)
+
+        # Inline-кнопки confirm
+        kb = InlineKeyboardBuilder()
+        kb.button(text="✅ Подтвердить", callback_data="confirm_yes")
+        kb.button(text="❌ Начать заново", callback_data="confirm_no")
+        kb.adjust(2)
+
+        await msg.answer(
+            "📝 *Предварительный BRD сформирован (некоторые поля пропущены).*",
+            parse_mode="Markdown",
+            reply_markup=kb.as_markup()
+        )
+
+        await send_long_message(msg, preview)
+        return
+
+    # Иначе — отправляем следующий вопрос
+    await msg.answer(f"⏭ Пропущено. Следующий вопрос:\n\n{QUESTIONS[step][1]}")
 
 
 # ==============================
