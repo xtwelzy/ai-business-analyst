@@ -1,4 +1,5 @@
 import os
+import re
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, PageBreak, Image, Table, TableStyle
@@ -25,21 +26,102 @@ class PDFEngine:
         self.styles.add(ParagraphStyle(name="Body", fontName="Montserrat", fontSize=11, leading=15, spaceAfter=6))
 
     # ----------------------------------------------------------------------
-    # Markdown-подобный обработчик
+    # ПАРСЕР Markdown-ТАБЛИЦ → ДВУМЕРНЫЙ МАССИВ
     # ----------------------------------------------------------------------
-    def add_markdown(self, elements, text: str):
-        lines = text.split("\n")
-        for ln in lines:
-            if ln.startswith("# "):
-                elements.append(Paragraph(ln[2:], self.styles["H1"]))
-            elif ln.startswith("## "):
-                elements.append(Paragraph(ln[3:], self.styles["H2"]))
-            elif ln.strip():
-                elements.append(Paragraph(ln, self.styles["Body"]))
-            elements.append(Spacer(1, 4))
+    def parse_markdown_table(self, block: str):
+        lines = block.strip().split("\n")
+        lines = [ln for ln in lines if ln.strip()]
+
+        # Находим строку --- разделителя
+        divider_index = None
+        for i, ln in enumerate(lines):
+            if re.match(r"^\|[-: ]+\|", ln):
+                divider_index = i
+                break
+
+        if divider_index is None:
+            return None
+
+        # Заголовки
+        header_line = lines[0]
+        headers = [h.strip() for h in header_line.strip("|").split("|")]
+
+        # Тело таблицы
+        rows = []
+        for ln in lines[divider_index + 1:]:
+
+            cols = [c.strip() for c in ln.strip("|").split("|")]
+
+            # GPT может разрывать строки → склеиваем
+            if len(cols) < len(headers):
+                if rows:
+                    rows[-1][-1] += " " + ln.strip()
+                continue
+
+            rows.append(cols)
+
+        return [headers] + rows
 
     # ----------------------------------------------------------------------
-    # Рендер таблицы
+    # РЕНДЕР МАРКДАУНА: ТЕКСТ + ТАБЛИЦЫ
+    # ----------------------------------------------------------------------
+    def add_markdown(self, elements, text: str):
+        # Шаблон Markdown-таблицы
+        pattern = r"(?:^\|.*\|\s*$\n?)+"
+        blocks = re.finditer(pattern, text, flags=re.MULTILINE)
+
+        last_end = 0
+
+        for match in blocks:
+            start, end = match.span()
+            table_block = match.group()
+
+            # 1. Рендер текста ДО таблицы
+            before_text = text[last_end:start].strip()
+            if before_text:
+                for ln in before_text.split("\n"):
+                    if ln.startswith("# "):
+                        elements.append(Paragraph(ln[2:], self.styles["H1"]))
+                    elif ln.startswith("## "):
+                        elements.append(Paragraph(ln[3:], self.styles["H2"]))
+                    elif ln.strip():
+                        elements.append(Paragraph(ln, self.styles["Body"]))
+                    elements.append(Spacer(1, 6))
+
+            # 2. Рендер самой таблицы
+            parsed = self.parse_markdown_table(table_block)
+            if parsed:
+                table = Table(parsed, repeatRows=1)
+                table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#f2f2f2")),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+                    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                    ('FONTNAME', (0, 0), (-1, -1), 'Montserrat'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 9),
+                    ('GRID', (0, 0), (-1, -1), 0.35, colors.grey),
+                    ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 4),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+                ]))
+                elements.append(table)
+                elements.append(Spacer(1, 16))
+
+            last_end = end
+
+        # 3. Текст ПОСЛЕ последней таблицы
+        remaining = text[last_end:].strip()
+        if remaining:
+            for ln in remaining.split("\n"):
+                if ln.startswith("# "):
+                    elements.append(Paragraph(ln[2:], self.styles["H1"]))
+                elif ln.startswith("## "):
+                    elements.append(Paragraph(ln[3:], self.styles["H2"]))
+                elif ln.strip():
+                    elements.append(Paragraph(ln, self.styles["Body"]))
+                elements.append(Spacer(1, 6))
+
+    # ----------------------------------------------------------------------
+    # Рендер обычной таблицы (если список)
     # ----------------------------------------------------------------------
     def add_table(self, elements, table_data):
         table = Table(table_data, repeatRows=1)
@@ -67,16 +149,13 @@ class PDFEngine:
         img = ImageReader(png_path)
         iw, ih = img.getSize()
 
-        # --- размеры страницы ---
         max_width = 480
-        max_height = 680  # Нижняя граница, с запасом
+        max_height = 680
 
-        # --- масштаб по ширине ---
         ratio = max_width / iw
         new_w = max_width
         new_h = ih * ratio
 
-        # --- если по высоте всё равно не влазит → уменьшаем ещё ---
         if new_h > max_height:
             ratio2 = max_height / new_h
             new_w = new_w * ratio2
@@ -109,7 +188,6 @@ class PDFEngine:
             elements.append(Spacer(1, 12))
 
             if isinstance(content, list):
-                # список или таблица
                 if len(content) > 0 and isinstance(content[0], list):
                     self.add_table(elements, content)
                 else:
