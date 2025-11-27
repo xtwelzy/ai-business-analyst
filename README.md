@@ -74,6 +74,7 @@ ai-business-analyst/
 │── config.py              # Конфигурация (.env)
 │── fonts/
 │     └── Montserrat-Regular.ttf
+│     └── Montserrat-Bold.ttf
 │── README.md
 │── requirements.txt
 └── .env
@@ -158,6 +159,7 @@ python bot.py
 | `/back`  | Вернуться на шаг назад    |
 | `/skip`  | Пропустить текущий вопрос |
 | `/help`  | Показать список команд    |
+| `/cancel`| отменить текущую сессию и начать заново    |
 
 ---
 
@@ -174,9 +176,13 @@ python bot.py
 
 ## ❤️ Автор
 
-**Разработчик:** Братуха (xtwelzy)
+**Разработчик:** Братуха (xtwelzy)<br>
 **Проект создан для:** ForteBank AI Hackathon
+</p>
 
 ---
 
 ## 📄 Лицензи
+  
+**MIT — свободное использование.**
+</p>
