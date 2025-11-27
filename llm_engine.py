@@ -5,19 +5,6 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 
 
 def extract_mermaid_blocks(text: str):
-    """
-    Извлекает mermaid-блоки из финального BRD.
-    Возвращает dict:
-    {
-        "document": <BRD без mermaid>,
-        "kpi_tree_mermaid": "...",
-        "usecase_mermaid": "...",
-        "bpmn_mermaid": "...",
-        "activity_mermaid": "...",
-        "sequence_mermaid": "..."
-    }
-    """
-
     import re
 
     mermaid_blocks = re.findall(r"```mermaid(.*?)```", text, flags=re.DOTALL)
@@ -33,16 +20,51 @@ def extract_mermaid_blocks(text: str):
     for block in mermaid_blocks:
         cleaned = block.strip()
 
-        if "Root" in cleaned and "KPI" in cleaned:
+        # KPI Tree
+        if "Root" in cleaned and ("KPI" in cleaned or "KPI " in cleaned):
             diagrams["kpi_tree_mermaid"] = cleaned
-        elif "Actor" in cleaned and "System" in cleaned:
+
+        # Use Case — надёжно
+        elif "flowchart" in cleaned and ("User" in cleaned or "Пользователь" in cleaned or "Actor" in cleaned):
             diagrams["usecase_mermaid"] = cleaned
-        elif "Start" in cleaned and "Step" in cleaned:
+
+        # BPMN-like
+        elif "Start" in cleaned and "End" in cleaned:
             diagrams["bpmn_mermaid"] = cleaned
-        elif "Action" in cleaned or "A1" in cleaned:
+
+        # Activity
+        elif "A1" in cleaned or "Action" in cleaned or "Действие" in cleaned:
             diagrams["activity_mermaid"] = cleaned
+
+        # Sequence
         elif "sequenceDiagram" in cleaned:
             diagrams["sequence_mermaid"] = cleaned
+
+    # ==== FALLBACKS ====
+
+    if diagrams["usecase_mermaid"] is None:
+        diagrams["usecase_mermaid"] = """
+flowchart LR
+    User((Пользователь))
+    System((Система))
+    External((Внешняя система))
+
+    User -->|Оставляет отзыв| System
+    System -->|Отправляет уведомление| User
+    System --> External
+""".strip()
+
+    if diagrams["activity_mermaid"] is None:
+        diagrams["activity_mermaid"] = """
+flowchart TD
+    Start --> A1[Сбор отзывов]
+    A1 --> A2[Классификация тональности]
+    A2 --> D{Негативный отзыв?}
+    D -->|Yes| A3[Отправка алерта менеджеру]
+    D -->|No| A4[Анализ положительных отзывов]
+    A3 --> End
+    A4 --> End
+""".strip()
 
     clean_doc = re.sub(r"```mermaid.*?```", "", text, flags=re.DOTALL)
 
@@ -53,18 +75,6 @@ def extract_mermaid_blocks(text: str):
 
 
 def generate_brd(requirements: dict) -> dict:
-    """
-    Генератор полного BRD — возвращает:
-    {
-        "document": "чистый BRD",
-        "kpi_tree_mermaid": "...",
-        "usecase_mermaid": "...",
-        "bpmn_mermaid": "...",
-        "activity_mermaid": "...",
-        "sequence_mermaid": "..."
-    }
-    """
-
     prompt = f"""
 Ты — Senior Business Analyst международного уровня (IIBA CBAP, PMI-PBA).
 Сформируй ИДЕАЛЬНЫЙ BRD документ строго по структуре ниже.
@@ -154,8 +164,13 @@ As a <role>, I want <feature>, so that <value>.
 # 11. Use Case Diagram (Mermaid)
 ```mermaid
 flowchart LR
-    Actor --> System
-    System --> ExternalSystem
+    User((Пользователь))
+    System((Система))
+    External((Внешняя система))
+
+    User -->|Оставляет отзыв| System
+    System -->|Отправляет уведомление| User
+    System --> External
 ```
 
 # 12. Business Process Diagram (Mermaid)
@@ -171,13 +186,14 @@ flowchart TD
 ```
 
 # 13. Activity Diagram (Mermaid)
+Построй Activity Diagram, отражающую обработку отзыва.
 ```mermaid
 flowchart TD
-    Start --> A1[Action 1]
-    A1 --> A2[Action 2]
-    A2 --> D{{OK?}}
-    D -->|Yes| A3[Finish]
-    D -->|No| A4[Rework]
+    Start --> A1[Сбор отзывов]
+    A1 --> A2[Классификация]
+    A2 --> D{{Негативный?}}
+    D -->|Yes| A3[Алерт менеджеру]
+    D -->|No| A4[Анализ положительных]
     A3 --> End
     A4 --> End
 ```
@@ -189,10 +205,10 @@ sequenceDiagram
     participant System
     participant Service
 
-    User->>System: Запрос
-    System->>Service: Обработка
-    Service-->>System: Ответ
-    System-->>User: Результат
+    User->>System: Отправляет отзыв
+    System->>Service: Классификация
+    Service-->>System: Результат
+    System-->>User: Уведомление
 ```
 
 # 15. Risk Matrix
