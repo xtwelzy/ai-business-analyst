@@ -6,111 +6,164 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 
 def generate_brd(requirements: dict) -> str:
     """
-    Генерирует полный BRD документ:
-    - Цель
-    - Проблема
+    Генерирует полный BRD документ с ВСЕМИ артефактами:
+    - Goal
+    - Problem
     - Stakeholders
     - Scope
     - Business Rules
     - FR
-    - NFR (расширенные)
-    - KPI (лидирующие + дерево)
+    - Extended NFR
+    - KPI + KPI Tree
+    - Acceptance Criteria
     - User Stories
     - Use Case Diagram
     - Business Process Diagram
     - Activity Diagram
     - Sequence Diagram
     - Risk Matrix
-    - Acceptance Criteria
     """
 
-    prompt = (
-        "Ты — senior business analyst. Сформируй полный BRD документ "
-        "по мировым стандартам IIBA, Agile, PMBOK.\n\n"
-        "Используй входные данные:\n"
-        f"{requirements}\n\n"
-        "Сформируй документ строго по структуре ниже.\n"
-        "Каждый блок — обязательный.\n\n"
-        "============================================================\n"
-        "# 1. Цель проекта\n"
-        "Опиши чётко и конкретно.\n\n"
-        "# 2. Описание бизнес-проблемы\n"
-        "Опиши корневую проблему, последствия и влияния.\n\n"
-        "# 3. Stakeholders\n"
-        "- Business Owner\n"
-        "- End Users\n"
-        "- SME\n"
-        "- BA\n"
-        "- IT Team\n"
-        "- External Actors\n\n"
-        "# 4. Scope\n"
-        "## In Scope\n"
-        "...\n"
-        "## Out of Scope\n"
-        "...\n\n"
-        "# 5. Бизнес-правила\n"
-        "Сформулируй конкретные правила.\n\n"
-        "# 6. Функциональные требования (FR)\n"
-        "Формат:\n"
-        "FR-01: ...\n"
-        "FR-02: ...\n\n"
-        "# 7. Нефункциональные требования (расширенные NFR)\n"
-        "- Performance (время ответа, обновление данных)\n"
-        "- Security (уровни доступа, шифрование)\n"
-        "- Scalability (масштабирование на N пользователей)\n"
-        "- Reliability (устойчивость, fault tolerance)\n"
-        "- Observability (логирование, мониторинг)\n"
-        "- Usability (UI/UX требования)\n"
-        "- Maintainability (поддержка, обновления)\n"
-        "- Compliance (регуляторные требования)\n\n"
-        "# 8. KPI / Лидирующие индикаторы\n"
-        "1) ...\n"
-        "2) ...\n\n"
-        "## KPI Tree (Mermaid)\n"
-        "```mermaid\n"
-        "flowchart TD\n"
-        "    Root[KPI Главная цель]\n"
-        "    Root --> KPI1\n"
-        "    Root --> KPI2\n"
-        "    Root --> KPI3\n"
-        "```\n\n"
-        "# 9. Acceptance Criteria\n"
-        "- AC-01: ...\n"
-        "- AC-02: ...\n"
-        "- AC-03: ...\n\n"
-        "# 10. User Stories\n"
-        "Формат:\n"
-        "As a <кто>, I want <что>, so that <ценность>.\n\n"
-        "# 11. Use Case Diagram (Mermaid)\n"
-        "```mermaid\n"
-        "flowchart LR\n"
-        "    Actor --> System\n"
-        "```\n\n"
-        "# 12. Business Process Diagram (BPMN / Flowchart)\n"
-        "```mermaid\n"
-        "flowchart TD\n"
-        "    Start --> Step1 --> Step2 --> End\n"
-        "```\n\n"
-        "# 13. Activity Diagram (Mermaid)\n"
-        "```mermaid\n"
-        "flowchart TD\n"
-        "    Start --> Activity1 --> Decision --> Activity2 --> End\n"
-        "```\n\n"
-        "# 14. Sequence Diagram (Mermaid)\n"
-        "```mermaid\n"
-        "sequenceDiagram\n"
-        "    participant User\n"
-        "    participant System\n"
-        "    User->>System: Действие\n"
-        "    System-->>User: Ответ\n"
-        "```\n\n"
-        "# 15. Risk Matrix\n"
-        "| Риск | Вероятность | Влияние | План реагирования |\n"
-        "|------|-------------|---------|--------------------|\n"
-        "| ... | ... | ... | ... |\n\n"
-        "============================================================\n"
-        "Верни ЧИСТЫЙ документ, без пояснений."
-    )
+    prompt = f"""
+Ты — Senior Business Analyst международного уровня (IIBA CBAP, PMI-PBA).
+Сформируй ИДЕАЛЬНЫЙ BRD документ строго по структуре ниже.
+
+Используй входные данные пользователя (JSON):
+{requirements}
+
+⚠️ ТРЕБОВАНИЯ:
+- Ноль воды
+- Только финальный документ
+- Чёткие формулировки
+- Диаграммы строго в формате mermaid
+- Таблицы в markdown
+- ВСЕ секции обязательны
+
+============================================================
+# 1. Цель проекта
+Опиши чёткую, измеримую, достижимую бизнес-цель.
+
+# 2. Описание бизнес-проблемы
+Опиши:
+- корневую причину
+- последствия
+- влияние на процессы
+- финансовый/операционный ущерб
+
+# 3. Stakeholders
+Укажи:
+- Business Owner
+- End Users
+- SME
+- BA
+- IT Team
+- External Actors
+
+# 4. Scope
+## In Scope
+Перечисли всё, что входит.
+## Out of Scope
+Перечисли исключения.
+
+# 5. Бизнес-правила
+Сформируй 5–10 конкретных правил.
+
+# 6. Функциональные требования (FR)
+Формат:
+FR-01: ...
+FR-02: ...
+FR-03: ...
+
+# 7. Extended Non-Functional Requirements (NFR)
+Разделы:
+- Performance
+- Security
+- Scalability
+- Reliability
+- Observability
+- Usability
+- Maintainability
+- Compliance
+
+Каждый раздел — 3–5 требований.
+
+# 8. KPI / Лидирующие показатели
+Сформируй минимум 4 KPI.
+
+## KPI Tree (Mermaid)
+```mermaid
+flowchart TD
+    Root[KPI Главная цель]
+    Root --> KPI1
+    Root --> KPI2
+    Root --> KPI3
+    KPI1 --> KPI11
+    KPI2 --> KPI21
+```
+
+# 9. Acceptance Criteria
+Минимум 5 критериев в формате:
+- AC-01: ...
+- AC-02: ...
+
+# 10. User Stories
+Формат:
+As a <role>, I want <feature>, so that <value>.
+Минимум 3–6 stories.
+
+# 11. Use Case Diagram (Mermaid)
+```mermaid
+flowchart LR
+    Actor --> System
+    System --> ExternalSystem
+```
+
+# 12. Business Process Diagram (Mermaid)
+```mermaid
+flowchart TD
+    Start([Start])
+    --> Step1
+    --> Step2
+    --> Decision{{condition?}}
+    -->|Yes| StepYes
+    -->|No| StepNo
+    --> End([End])
+```
+
+# 13. Activity Diagram (Mermaid)
+```mermaid
+flowchart TD
+    Start --> A1[Action 1]
+    A1 --> A2[Action 2]
+    A2 --> D{{OK?}}
+    D -->|Yes| A3[Finish]
+    D -->|No| A4[Rework]
+    A3 --> End
+    A4 --> End
+```
+
+# 14. Sequence Diagram (Mermaid)
+```mermaid
+sequenceDiagram
+    participant User
+    participant System
+    participant Service
+
+    User->>System: Запрос
+    System->>Service: Обработка
+    Service-->>System: Ответ
+    System-->>User: Результат
+```
+
+# 15. Risk Matrix
+| Риск | Вероятность | Влияние | Митигирование |
+|------|-------------|---------|----------------|
+| ... | ... | ... | ... |
+| ... | ... | ... | ... |
+
+============================================================
+Верни только финальный BRD документ. БЕЗ пояснений.
+"""
 
     response = client.chat.completions.create(
         model=MODEL,
@@ -118,7 +171,7 @@ def generate_brd(requirements: dict) -> str:
             {"role": "system", "content": "Ты — эксперт по бизнес-аналитике уровня Senior."},
             {"role": "user", "content": prompt}
         ],
-        temperature=0.2
+        temperature=0.15
     )
 
     return response.choices[0].message.content
