@@ -217,7 +217,7 @@ python bot.py
 
 ## ❤️ Автор
 
-**Разработчик:** Братуха (xtwelzy)<br>
+**Разработчик:** Братуха (serafiel)<br>
 **Проект создан для:** ForteBank AI Hackathon
 </p>
 
